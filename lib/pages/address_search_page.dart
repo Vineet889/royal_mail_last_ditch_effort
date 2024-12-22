@@ -58,17 +58,17 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
       var input = document.getElementById('$_inputId');
       if (input && !window.addressNowInitialized) {
         // Initialize AddressNow for UK only
-        var control = new pca.Address(input, {
+        var fields = [{
+          element: input,
+          field: "",
+          mode: pca.fieldMode.SEARCH
+        }];
+
+        var options = {
           key: "YOUR_API_KEY",
-          countries: {
-            codesList: "GBR",
-            defaultCode: "GBR"
-          },
-          search: {
-            countries: ["GBR"]
-          },
-          onPopulate: function(address, variations) {
-            console.log('Address populated:', address); // Debug log
+          search: { countries: ["GBR"] },
+          onSelect: function(address) {
+            console.log('Address selected:', address);
             
             // Format the address for our callback
             var formattedAddress = {
@@ -78,44 +78,28 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
               postcode: address.PostalCode || ''
             };
             
-            console.log('Formatted address:', formattedAddress); // Debug log
-            
-            // Call our Dart callback
+            console.log('Calling handleAddressSelect with:', formattedAddress);
             window.handleAddressSelect(formattedAddress);
-          },
-          onSearchComplete: function(items) {
-            console.log('Search complete:', items); // Debug log
           }
-        });
+        };
 
-        // Store control reference globally
+        var control = new pca.Address(fields, options);
         window.addressNowControl = control;
         window.addressNowInitialized = true;
-        
-        console.log('AddressNow initialized successfully'); // Debug log
+        console.log('AddressNow initialized successfully');
       }
     ''']);
 
-    // Setup the callback handler with explicit error handling
+    // Setup the callback handler
     js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
-      print('Address selected in Dart: $addressData'); // Debug log
+      print('Address selected in Dart: $addressData');
       
-      try {
-        if (addressData != null) {
-          final Map<String, dynamic> address = Map<String, dynamic>.from(addressData);
-          print('Converted address: $address'); // Debug log
-          
-          // Ensure we're updating the state on the UI thread
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            setState(() {
-              _selectedAddress = Address.fromJson(address);
-              _isContinueEnabled = true;
-              print('State updated - Continue enabled'); // Debug log
-            });
-          });
-        }
-      } catch (e) {
-        print('Error in handleAddressSelect: $e'); // Debug log
+      if (addressData != null) {
+        setState(() {
+          _selectedAddress = Address.fromJson(Map<String, dynamic>.from(addressData));
+          _isContinueEnabled = true;
+          print('State updated - Continue enabled: $_isContinueEnabled');
+        });
       }
     });
   }
