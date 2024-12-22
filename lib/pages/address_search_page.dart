@@ -28,33 +28,24 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     js.context.callMethod('eval', ['''
       var input = document.getElementById('$_inputId');
       if (input && !window.addressNowInitialized) {
-        var fields = [{
-          element: input,
-          field: "",
-          mode: pca.fieldMode.SEARCH
-        }];
-
-        var options = {
+        var control = new pca.Address(input, {
           key: "YOUR_API_KEY",
-          search: {
-            countries: ['GBR']
-          },
           countries: {
-            codesList: "GBR",
+            codesList: ["GBR"],
             defaultCode: "GBR"
+          },
+          search: {
+            countries: ["GBR"]
           },
           bar: {
             visible: true,
             showCountry: false
           },
-          onPopulate: function(address, variations) {
-            console.log('Address populated:', address);
+          capture: "line1,line2,city,postcode",
+          onPopulate: function(address) {
+            console.log('onPopulate triggered with:', address);
             
-            if (!address) {
-              console.error('No address data received');
-              return;
-            }
-            
+            // Format the address for our callback
             var formattedAddress = {
               line1: address.Line1 || '',
               line2: address.Line2 || '',
@@ -62,20 +53,30 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
               postcode: address.PostalCode || ''
             };
             
-            console.log('Calling handleAddressSelect with:', formattedAddress);
-            window.handleAddressSelect(formattedAddress);
+            console.log('Formatted address:', formattedAddress);
+            
+            // Call our callback
+            if (typeof window.handleAddressSelect === 'function') {
+              window.handleAddressSelect(formattedAddress);
+            } else {
+              console.error('handleAddressSelect is not defined');
+            }
+          },
+          onSearchComplete: function(items) {
+            console.log('Search complete with items:', items);
           }
-        };
+        });
 
-        var control = new pca.Address(fields, options);
+        // Store control reference globally
         window.addressNowControl = control;
         window.addressNowInitialized = true;
-        console.log('AddressNow initialized with fields and options');
+        console.log('AddressNow initialized with direct configuration');
       }
     ''']);
 
+    // Setup the callback handler
     js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
-      print('handleAddressSelect called with data: $addressData');
+      print('handleAddressSelect called with: $addressData');
       
       if (addressData == null) {
         print('Error: Received null address data');
@@ -84,25 +85,28 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
 
       try {
         final Map<String, dynamic> address = Map<String, dynamic>.from(addressData);
-        print('Converting to Dart Map: $address');
-        
-        setState(() {
-          _selectedAddress = Address.fromJson(address);
-          _isContinueEnabled = true;
-          print('State updated with address: $_selectedAddress');
-        });
-      } catch (e) {
-        print('Error processing address: $e');
+        print('Processing address data: $address');
+
+        if (mounted) {
+          setState(() {
+            _selectedAddress = Address.fromJson(address);
+            _isContinueEnabled = _selectedAddress != null && 
+                               _selectedAddress!.line1.isNotEmpty;
+            print('State updated:');
+            print('Selected address: $_selectedAddress');
+            print('Continue enabled: $_isContinueEnabled');
+          });
+        }
+      } catch (e, stackTrace) {
+        print('Error processing address:');
+        print('Error: $e');
+        print('Stack trace: $stackTrace');
       }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    // Add debug print to track rebuilds
-    print('Building AddressSearchPage with selectedAddress: $_selectedAddress');
-    print('Continue button enabled: $_isContinueEnabled');
-
     return Scaffold(
       appBar: AppBar(title: const Text('Address Search')),
       body: Center(
@@ -117,13 +121,14 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
                 child: HtmlElementView(viewType: _inputId),
               ),
               const SizedBox(height: 16),
-              if (_selectedAddress != null) 
-                Text('Selected Address: ${_selectedAddress.toString()}'),
+              // Debug text to show current state
+              Text('Selected Address: ${_selectedAddress?.toString() ?? "None"}'),
+              Text('Continue Enabled: $_isContinueEnabled'),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: (_selectedAddress != null && _isContinueEnabled)
                     ? () {
-                        print('Continue button pressed with address: $_selectedAddress');
+                        print('Continue button pressed');
                         Navigator.push(
                           context,
                           MaterialPageRoute(
