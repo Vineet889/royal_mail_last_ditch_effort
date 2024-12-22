@@ -60,7 +60,7 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
         // Initialize AddressNow
         var fields = [{
           element: input,
-          field: "{Line1}",
+          field: "",
           mode: pca.fieldMode.SEARCH
         }];
 
@@ -68,12 +68,14 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
           key: "YOUR_API_KEY",
           search: { countries: "GBR" },
           populate: true,
-          onSelect: function(address) {
+          onSelect: function(address, variations) {
+            console.log('Selected address:', address);
+            
             window.handleAddressSelect({
               line1: address.Line1 || '',
               line2: address.Line2 || '',
               city: address.City || '',
-              postcode: address.PostalCode || ''
+              postcode: address.PostalCode || '',
             });
           }
         };
@@ -84,12 +86,16 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     ''']);
 
     // Setup the callback handler
-    js.context['handleAddressSelect'] = (dynamic addressData) {
-      setState(() {
-        _selectedAddress = Address.fromJson(addressData);
-        _isContinueEnabled = true;
-      });
-    };
+    js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
+      print('Address selected: $addressData');
+      
+      if (addressData != null) {
+        setState(() {
+          _selectedAddress = Address.fromJson(Map<String, dynamic>.from(addressData));
+          _isContinueEnabled = true;
+        });
+      }
+    });
   }
 
   @override
