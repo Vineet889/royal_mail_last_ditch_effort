@@ -65,12 +65,12 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
         ? lines.sublist(1, lines.length - 2).join(', ').trim()
         : '';
 
-    final address = Address(
-      line1: line1,
-      line2: line2,
-      city: city,
-      postcode: postcode,
-    );
+    // final address = Address(
+    //   line1: line1,
+    //   line2: line2,
+    //   city: city,
+    //   postcode: postcode,
+    // );
 
     setState(() {
       _isContinueEnabled = true;
@@ -110,7 +110,7 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
                       if (addressData != null) {
                         final address = Address.fromJson(
                           Map<String, dynamic>.from(
-                            js.JsObject.dartify(addressData) as Map
+                            js.JsObject.fromBrowserObject(addressData) as Map
                           )
                         );
                         Navigator.push(
