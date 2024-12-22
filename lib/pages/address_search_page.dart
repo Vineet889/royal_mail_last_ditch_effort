@@ -14,135 +14,105 @@ class AddressSearchPage extends StatefulWidget {
 }
 
 class _AddressSearchPageState extends State<AddressSearchPage> {
-  final String _inputId = 'addressNowInput';
+  final String _inputId = 'searchBox';
   Address? _selectedAddress;
   bool _isContinueEnabled = false;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(milliseconds: 500), _initializeAddressNow);
+    _initializeAddressNow();
   }
 
   void _initializeAddressNow() {
     js.context.callMethod('eval', ['''
-      var input = document.getElementById('$_inputId');
-      if (input && !window.addressNowInitialized) {
-        var control = new pca.Address(input, {
-          key: "YOUR_API_KEY",
-          countries: {
-            codesList: "GBR",
-            defaultCode: "GBR"
-          },
-          search: {
-            countries: ["GBR"]
-          },
-          bar: {
-            visible: true,
-            showCountry: false
-          },
-          onPopulate: function(address) {
-            console.log('onPopulate event:', address);
-            handleAddressSelection(address);
-          },
-          onSelect: function(address) {
-            console.log('onSelect event:', address);
-            handleAddressSelection(address);
-          }
-        });
-
-        window.handleAddressSelection = function(address) {
-          if (!address) {
-            console.error('No address data received');
-            return;
-          }
-
-          var formattedAddress = {
-            line1: address.Line1 || '',
-            line2: address.Line2 || '',
-            city: address.City || '',
-            postcode: address.PostalCode || ''
+      // Basic AddressNow initialization
+      var searchBox = document.getElementById('$_inputId');
+      
+      var options = {
+        key: "YOUR_API_KEY",
+        onSelect: function(address) {
+          // Simple address formatting
+          var result = {
+            line1: address.Line1,
+            line2: address.Line2,
+            city: address.City,
+            postcode: address.PostalCode
           };
+          
+          console.log('Address selected:', result);
+          window.handleAddressSelect(result);
+        }
+      };
 
-          console.log('Formatted address:', formattedAddress);
-          window.handleAddressSelect(formattedAddress);
-        };
-
-        window.addressNowControl = control;
-        window.addressNowInitialized = true;
-        console.log('AddressNow initialized successfully');
-      }
+      var control = new pca.Address(searchBox, options);
+      console.log('AddressNow initialized');
     ''']);
 
-    js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
-      print('Dart received address: $addressData');
+    // Simple callback handler
+    js.context['handleAddressSelect'] = js.allowInterop((dynamic result) {
+      print('Address received: $result');
       
-      if (addressData == null) {
-        print('Error: Null address data received');
-        return;
-      }
-
-      try {
-        final Map<String, dynamic> address = Map<String, dynamic>.from(addressData);
-        print('Processing address: $address');
-
-        if (mounted) {
-          setState(() {
-            _selectedAddress = Address.fromJson(address);
-            _isContinueEnabled = _selectedAddress != null && 
-                               _selectedAddress!.line1.isNotEmpty;
-            print('Address set: $_selectedAddress');
-            print('Continue enabled: $_isContinueEnabled');
-          });
-        }
-      } catch (e) {
-        print('Error processing address: $e');
-      }
+      setState(() {
+        _selectedAddress = Address.fromJson(Map<String, dynamic>.from(result));
+        _isContinueEnabled = true;
+        print('Address set: $_selectedAddress');
+      });
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Address Search')),
-      body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              SizedBox(
-                height: 50,
-                child: HtmlElementView(viewType: _inputId),
-              ),
-              const SizedBox(height: 16),
-              if (_selectedAddress != null)
-                Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Text(
-                    'Selected: ${_selectedAddress!.line1}, ${_selectedAddress!.postcode}',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+      appBar: AppBar(title: const Text('Find Address')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Search box
+            SizedBox(
+              height: 50,
+              child: HtmlElementView(viewType: _inputId),
+            ),
+            const SizedBox(height: 20),
+            
+            // Selected address display
+            if (_selectedAddress != null)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_selectedAddress!.line1),
+                      if (_selectedAddress!.line2.isNotEmpty)
+                        Text(_selectedAddress!.line2),
+                      Text(_selectedAddress!.city),
+                      Text(_selectedAddress!.postcode),
+                    ],
                   ),
                 ),
-              ElevatedButton(
-                onPressed: (_selectedAddress != null && _isContinueEnabled)
-                    ? () {
-                        print('Navigating with address: $_selectedAddress');
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddressDetailsPage(
-                              address: _selectedAddress!,
-                            ),
-                          ),
-                        );
-                      }
-                    : null,
-                child: const Text('Continue'),
               ),
-            ],
-          ),
+            
+            const SizedBox(height: 20),
+            
+            // Continue button
+            ElevatedButton(
+              onPressed: _isContinueEnabled
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddressDetailsPage(
+                            address: _selectedAddress!,
+                          ),
+                        ),
+                      );
+                    }
+                  : null,
+              child: const Text('Continue'),
+            ),
+          ],
         ),
       ),
     );
@@ -150,12 +120,7 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
 
   @override
   void dispose() {
-    js.context.callMethod('eval', ['''
-      if (window.addressNowControl) {
-        window.addressNowControl.destroy();
-      }
-      window.addressNowInitialized = false;
-    ''']);
+    js.context.callMethod('eval', ['window.addressNowControl = null;']);
     super.dispose();
   }
 } 
