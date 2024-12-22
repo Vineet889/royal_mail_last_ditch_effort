@@ -12,18 +12,17 @@ class Address {
   });
 
   factory Address.fromJson(Map<String, dynamic> json) {
+    print('Creating Address from JSON: $json'); // Debug log
     return Address(
-      line1: json['line1'] as String? ?? '',
-      line2: json['line2'] as String? ?? '',
-      city: json['city'] as String? ?? '',
-      postcode: json['postcode'] as String? ?? '',
+      line1: json['line1']?.toString() ?? '',
+      line2: json['line2']?.toString() ?? '',
+      city: json['city']?.toString() ?? '',
+      postcode: json['postcode']?.toString() ?? '',
     );
   }
 
-  Map<String, dynamic> toJson() => {
-    'line1': line1,
-    'line2': line2,
-    'city': city,
-    'postcode': postcode,
-  };
+  @override
+  String toString() {
+    return 'Address(line1: $line1, line2: $line2, city: $city, postcode: $postcode)';
+  }
 } 

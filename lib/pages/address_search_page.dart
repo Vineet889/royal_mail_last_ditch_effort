@@ -67,8 +67,8 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
           search: {
             countries: ["GBR"]
           },
-          onPopulate: function(address) {
-            console.log('Address selected:', address); // Debug log
+          onPopulate: function(address, variations) {
+            console.log('Address populated:', address); // Debug log
             
             // Format the address for our callback
             var formattedAddress = {
@@ -78,27 +78,44 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
               postcode: address.PostalCode || ''
             };
             
+            console.log('Formatted address:', formattedAddress); // Debug log
+            
             // Call our Dart callback
-            if (window.handleAddressSelect) {
-              window.handleAddressSelect(formattedAddress);
-            }
+            window.handleAddressSelect(formattedAddress);
+          },
+          onSearchComplete: function(items) {
+            console.log('Search complete:', items); // Debug log
           }
         });
 
-        window.addressNowControl = control;  // Store reference
+        // Store control reference globally
+        window.addressNowControl = control;
         window.addressNowInitialized = true;
+        
+        console.log('AddressNow initialized successfully'); // Debug log
       }
     ''']);
 
-    // Setup the callback handler
+    // Setup the callback handler with explicit error handling
     js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
       print('Address selected in Dart: $addressData'); // Debug log
       
-      if (addressData != null) {
-        setState(() {
-          _selectedAddress = Address.fromJson(Map<String, dynamic>.from(addressData));
-          _isContinueEnabled = true;
-        });
+      try {
+        if (addressData != null) {
+          final Map<String, dynamic> address = Map<String, dynamic>.from(addressData);
+          print('Converted address: $address'); // Debug log
+          
+          // Ensure we're updating the state on the UI thread
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            setState(() {
+              _selectedAddress = Address.fromJson(address);
+              _isContinueEnabled = true;
+              print('State updated - Continue enabled'); // Debug log
+            });
+          });
+        }
+      } catch (e) {
+        print('Error in handleAddressSelect: $e'); // Debug log
       }
     });
   }
