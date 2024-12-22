@@ -14,6 +14,7 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
   final TextEditingController _postcodeController = TextEditingController();
   Address? _selectedAddress;
   bool _isContinueEnabled = false;
+  final String _inputId = 'addressNowInput';
 
   @override
   void initState() {
@@ -54,13 +55,9 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              TextField(
-                controller: _postcodeController,
-                decoration: const InputDecoration(
-                  labelText: 'Enter Postcode',
-                  border: OutlineInputBorder(),
-                ),
-                onChanged: (_) => _setupAddressNowField(),
+              HtmlElementView(
+                viewType: _inputId,
+                key: ValueKey(_inputId),
               ),
               const SizedBox(height: 20),
               ElevatedButton(
@@ -83,18 +80,66 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     );
   }
 
-  void _setupAddressNowField() {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _createInputElement();
+  }
+
+  void _createInputElement() {
+    // Register the platform view
+    if (js.context['_addressInputRegistered'] == null) {
+      js.context['_addressInputRegistered'] = true;
+      
+      // Create and register the platform view factory
+      js.context.callMethod('eval', ['''
+        function AddressInputFactory() {}
+        AddressInputFactory.prototype.createElement = function() {
+          var container = document.createElement('div');
+          var input = document.createElement('input');
+          input.type = 'text';
+          input.id = '$_inputId';
+          input.className = 'form-control';
+          input.placeholder = 'Enter postcode';
+          container.appendChild(input);
+          
+          // Initialize AddressNow on the input
+          setTimeout(function() {
+            if (window.AddressNow) {
+              AddressNow.listen('#$_inputId', {
+                key: 'YOUR_API_KEY',
+                onSelect: function(address) {
+                  window.handleAddressSelect({
+                    line1: address.line1,
+                    line2: address.line2,
+                    city: address.town,
+                    postcode: address.postcode
+                  });
+                }
+              });
+            }
+          }, 1000);
+          
+          return container;
+        };
+        
+        // Register the factory
+        window.platformViewRegistry.registerViewFactory('$_inputId', function(viewId) {
+          return new AddressInputFactory().createElement();
+        });
+      ''']);
+    }
+  }
+
+  @override
+  void dispose() {
+    // Cleanup any resources
     js.context.callMethod('eval', ['''
-      AddressNow.listen('.address-search', {
-        onSelect: function(address) {
-          window.handleAddressSelect({
-            line1: address.line1,
-            line2: address.line2,
-            city: address.town,
-            postcode: address.postcode
-          });
-        }
-      });
+      var input = document.getElementById('$_inputId');
+      if (input) {
+        input.remove();
+      }
     ''']);
+    super.dispose();
   }
 } 

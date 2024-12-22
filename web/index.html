@@ -32,6 +32,13 @@
   <title>royal_mail_last_ditch_effort</title>
   <link rel="manifest" href="manifest.json">
   <script>
+    // Initialize platform view registry
+    window.platformViewRegistry = window.platformViewRegistry || {
+      registerViewFactory: function(viewId, callback) {
+        window[viewId + '_factory'] = callback;
+      }
+    };
+    
     // This will hold our callback function
     window.handleAddressSelect = function(address) {
       // This will be overwritten by the Dart code
