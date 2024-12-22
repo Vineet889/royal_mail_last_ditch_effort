@@ -1,11 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <!-- AddressNow CSS and JS -->
+  <link rel="stylesheet" type="text/css" href="https://api.addressnow.co.uk/css/addressnow-2.20.min.css">
+  <script type="text/javascript" src="https://api.addressnow.co.uk/js/addressnow-2.20.min.js"></script>
+  
   <script>
     window.platformViewRegistry = window.platformViewRegistry || {
       registerViewFactory: function(viewId, callback) {
         window[viewId + '_factory'] = callback;
       }
+    };
+    
+    // This will hold our callback function
+    window.handleAddressSelect = function(address) {
+      console.log('Default handler called with:', address);
     };
   </script>
   <!--
@@ -38,20 +47,6 @@
 
   <title>royal_mail_last_ditch_effort</title>
   <link rel="manifest" href="manifest.json">
-  <script>
-    // Initialize platform view registry
-    window.platformViewRegistry = window.platformViewRegistry || {
-      registerViewFactory: function(viewId, callback) {
-        window[viewId + '_factory'] = callback;
-      }
-    };
-    
-    // This will hold our callback function
-    window.handleAddressSelect = function(address) {
-      // Will be overwritten by Dart
-      console.log('Default handler called with:', address);
-    };
-  </script>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>
