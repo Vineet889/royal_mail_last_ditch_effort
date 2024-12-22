@@ -57,17 +57,17 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     js.context.callMethod('eval', ['''
       var input = document.getElementById('$_inputId');
       if (input && !window.addressNowInitialized) {
-        // Initialize AddressNow for UK only
-        var fields = [{
-          element: input,
-          field: "",
-          mode: pca.fieldMode.SEARCH
-        }];
-
-        var options = {
+        var control = new pca.Address(input, {
           key: "YOUR_API_KEY",
-          search: { countries: ["GBR"] },
-          onSelect: function(address) {
+          countries: {
+            codesList: "GBR",
+            defaultCode: "GBR"
+          },
+          search: {
+            countries: ["GBR"],
+            setCountry: "GBR"
+          },
+          onSelect: function(address, variations) {
             console.log('Address selected:', address);
             
             // Format the address for our callback
@@ -79,27 +79,42 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
             };
             
             console.log('Calling handleAddressSelect with:', formattedAddress);
-            window.handleAddressSelect(formattedAddress);
+            
+            // Ensure the callback exists before calling
+            if (typeof window.handleAddressSelect === 'function') {
+              window.handleAddressSelect(formattedAddress);
+            } else {
+              console.error('handleAddressSelect is not defined');
+            }
           }
-        };
+        });
 
-        var control = new pca.Address(fields, options);
+        // Store control reference globally
         window.addressNowControl = control;
         window.addressNowInitialized = true;
-        console.log('AddressNow initialized successfully');
+        console.log('AddressNow initialized successfully with UK-only configuration');
       }
     ''']);
 
-    // Setup the callback handler
+    // Setup the callback handler with proper error handling
     js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
       print('Address selected in Dart: $addressData');
       
-      if (addressData != null) {
-        setState(() {
-          _selectedAddress = Address.fromJson(Map<String, dynamic>.from(addressData));
-          _isContinueEnabled = true;
-          print('State updated - Continue enabled: $_isContinueEnabled');
-        });
+      try {
+        if (addressData != null) {
+          final address = Map<String, dynamic>.from(addressData);
+          print('Processing address: $address');
+          
+          setState(() {
+            _selectedAddress = Address.fromJson(address);
+            _isContinueEnabled = true;
+            print('State updated - Selected address: $_selectedAddress');
+            print('Continue button enabled: $_isContinueEnabled');
+          });
+        }
+      } catch (e, stackTrace) {
+        print('Error processing address: $e');
+        print('Stack trace: $stackTrace');
       }
     });
   }
