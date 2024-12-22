@@ -23,10 +23,60 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
   }
 
   void _initializeAddressNow() {
-    // Add the Royal Mail AddressNow scripts to the head
-    _addScriptToHead('https://api.addressnow.co.uk/css/addressnow-2.20.min.css?key=YOUR_API_KEY');
-    _addScriptToHead('https://api.addressnow.co.uk/js/addressnow-2.20.min.js?key=YOUR_API_KEY');
-    
+    js.context.callMethod('eval', ['''
+      // Create input element factory
+      function AddressInputFactory() {
+        var container = document.createElement('div');
+        container.style.width = '100%';
+        container.style.height = '56px';  // Match Material Design height
+        
+        var input = document.createElement('input');
+        input.id = '$_inputId';
+        input.type = 'text';
+        input.style.width = '100%';
+        input.style.height = '100%';
+        input.style.padding = '8px';
+        input.style.border = '1px solid #ccc';
+        input.style.borderRadius = '4px';
+        input.style.fontSize = '16px';
+        
+        container.appendChild(input);
+        
+        // Initialize AddressNow after a short delay to ensure DOM is ready
+        setTimeout(function() {
+          var fields = [{
+            element: input,
+            field: "Line1",
+            mode: pca.fieldMode.SEARCH
+          }];
+          
+          var options = {
+            key: "YOUR_API_KEY",
+            search: {
+              countries: "GBR"
+            },
+            onSelect: function(address) {
+              window.handleAddressSelect({
+                line1: address.Line1 || '',
+                line2: address.Line2 || '',
+                city: address.City || '',
+                postcode: address.PostalCode || ''
+              });
+            }
+          };
+          
+          var control = new pca.Address(fields, options);
+        }, 1000);
+        
+        return container;
+      }
+      
+      // Register the factory
+      window.platformViewRegistry.registerViewFactory('$_inputId', function(viewId) {
+        return new AddressInputFactory();
+      });
+    ''']);
+
     // Setup JavaScript callback
     js.context['handleAddressSelect'] = (dynamic addressData) {
       setState(() {
@@ -36,108 +86,55 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     };
   }
 
-  void _addScriptToHead(String url) {
-    js.context.callMethod('eval', ['''
-      var script = document.createElement('script');
-      script.src = "$url";
-      document.head.appendChild(script);
-    ''']);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Address Search')),
-      body: Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 400),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              HtmlElementView(
-                viewType: _inputId,
-                key: ValueKey(_inputId),
+      appBar: AppBar(title: const Text('Enter Address')),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _postcodeController,
+              decoration: const InputDecoration(
+                labelText: 'Postcode',
+                border: OutlineInputBorder(),
               ),
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: _isContinueEnabled
-                    ? () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => AddressDetailsPage(
-                              address: _selectedAddress!,
-                            ),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 56, // Fixed height for the input
+              child: HtmlElementView(viewType: _inputId),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _isContinueEnabled
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AddressDetailsPage(
+                            address: _selectedAddress!,
                           ),
-                        )
-                    : null,
-                child: const Text('Continue'),
-              ),
-            ],
-          ),
+                        ),
+                      );
+                    }
+                  : null,
+              child: const Text('Continue'),
+            ),
+          ],
         ),
       ),
     );
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _createInputElement();
-  }
-
-  void _createInputElement() {
-    // Register the platform view
-    if (js.context['_addressInputRegistered'] == null) {
-      js.context['_addressInputRegistered'] = true;
-      
-      // Create and register the platform view factory
-      js.context.callMethod('eval', ['''
-        function AddressInputFactory() {}
-        AddressInputFactory.prototype.createElement = function() {
-          var container = document.createElement('div');
-          var input = document.createElement('input');
-          input.type = 'text';
-          input.id = '$_inputId';
-          input.className = 'form-control';
-          input.placeholder = 'Enter postcode';
-          container.appendChild(input);
-          
-          // Initialize AddressNow on the input
-          setTimeout(function() {
-            if (window.AddressNow) {
-              AddressNow.listen('#$_inputId', {
-                key: 'YOUR_API_KEY',
-                onSelect: function(address) {
-                  window.handleAddressSelect({
-                    line1: address.line1,
-                    line2: address.line2,
-                    city: address.town,
-                    postcode: address.postcode
-                  });
-                }
-              });
-            }
-          }, 1000);
-          
-          return container;
-        };
-        
-        // Register the factory
-        window.platformViewRegistry.registerViewFactory('$_inputId', function(viewId) {
-          return new AddressInputFactory().createElement();
-        });
-      ''']);
-    }
-  }
-
-  @override
   void dispose() {
-    // Cleanup any resources
     js.context.callMethod('eval', ['''
       var input = document.getElementById('$_inputId');
       if (input) {
-        input.remove();
+        input.parentElement.remove();
       }
     ''']);
     super.dispose();
