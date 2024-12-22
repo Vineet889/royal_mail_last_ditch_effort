@@ -11,25 +11,36 @@ class AddressSearchPage extends StatefulWidget {
 }
 
 class _AddressSearchPageState extends State<AddressSearchPage> {
-  final TextEditingController _postcodeController = TextEditingController();
+  final String _inputId = 'addressNowInput';
   Address? _selectedAddress;
   bool _isContinueEnabled = false;
-  final String _inputId = 'addressNowInput';
 
   @override
   void initState() {
     super.initState();
-    _initializeAddressNow();
+    // Add the scripts in initState
+    _addScriptToHead('https://api.addressnow.co.uk/css/addressnow-2.20.min.css?key=YOUR_API_KEY');
+    _addScriptToHead('https://api.addressnow.co.uk/js/addressnow-2.20.min.js?key=YOUR_API_KEY');
+    
+    // Register the element factory after a delay to ensure scripts are loaded
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      _initializeAddressNow();
+    });
+  }
+
+  void _addScriptToHead(String src) {
+    js.context.callMethod('eval', ['''
+      var script = document.createElement('script');
+      script.src = '$src';
+      document.head.appendChild(script);
+    ''']);
   }
 
   void _initializeAddressNow() {
+    // Create and register the HTML element
     js.context.callMethod('eval', ['''
-      // Create input element factory
-      function AddressInputFactory() {
-        var container = document.createElement('div');
-        container.style.width = '100%';
-        container.style.height = '56px';  // Match Material Design height
-        
+      if (!window.addressNowInitialized) {
+        // Create the input element
         var input = document.createElement('input');
         input.id = '$_inputId';
         input.type = 'text';
@@ -39,45 +50,40 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
         input.style.border = '1px solid #ccc';
         input.style.borderRadius = '4px';
         input.style.fontSize = '16px';
-        
-        container.appendChild(input);
-        
-        // Initialize AddressNow after a short delay to ensure DOM is ready
-        setTimeout(function() {
-          var fields = [{
-            element: input,
-            field: "Line1",
-            mode: pca.fieldMode.SEARCH
-          }];
-          
-          var options = {
-            key: "YOUR_API_KEY",
-            search: {
-              countries: "GBR"
-            },
-            onSelect: function(address) {
-              window.handleAddressSelect({
-                line1: address.Line1 || '',
-                line2: address.Line2 || '',
-                city: address.City || '',
-                postcode: address.PostalCode || ''
-              });
-            }
-          };
-          
-          var control = new pca.Address(fields, options);
-        }, 1000);
-        
-        return container;
+        input.placeholder = 'Enter your postcode';
+
+        // Register the factory
+        window.platformViewRegistry.registerViewFactory('$_inputId', function(viewId) {
+          return input;
+        });
+
+        // Initialize AddressNow
+        var fields = [{
+          element: input,
+          field: "{Line1}",
+          mode: pca.fieldMode.SEARCH
+        }];
+
+        var options = {
+          key: "YOUR_API_KEY",
+          search: { countries: "GBR" },
+          onSelect: function(address) {
+            window.handleAddressSelect({
+              line1: address.Line1 || '',
+              line2: address.Line2 || '',
+              city: address.City || '',
+              postcode: address.PostalCode || ''
+            });
+          }
+        };
+
+        // Create the control
+        var control = new pca.Address(fields, options);
+        window.addressNowInitialized = true;
       }
-      
-      // Register the factory
-      window.platformViewRegistry.registerViewFactory('$_inputId', function(viewId) {
-        return new AddressInputFactory();
-      });
     ''']);
 
-    // Setup JavaScript callback
+    // Setup the callback handler
     js.context['handleAddressSelect'] = (dynamic addressData) {
       setState(() {
         _selectedAddress = Address.fromJson(addressData);
@@ -95,16 +101,12 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextField(
-              controller: _postcodeController,
-              decoration: const InputDecoration(
-                labelText: 'Postcode',
-                border: OutlineInputBorder(),
+            Container(
+              height: 56,
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.transparent),
+                borderRadius: BorderRadius.circular(4),
               ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 56, // Fixed height for the input
               child: HtmlElementView(viewType: _inputId),
             ),
             const SizedBox(height: 16),
@@ -134,8 +136,9 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     js.context.callMethod('eval', ['''
       var input = document.getElementById('$_inputId');
       if (input) {
-        input.parentElement.remove();
+        input.remove();
       }
+      window.addressNowInitialized = false;
     ''']);
     super.dispose();
   }
