@@ -57,37 +57,42 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     js.context.callMethod('eval', ['''
       var input = document.getElementById('$_inputId');
       if (input && !window.addressNowInitialized) {
-        // Initialize AddressNow
-        var fields = [{
-          element: input,
-          field: "",
-          mode: pca.fieldMode.SEARCH
-        }];
-
-        var options = {
+        // Initialize AddressNow for UK only
+        var control = new pca.Address(input, {
           key: "YOUR_API_KEY",
-          search: { countries: "GBR" },
-          populate: true,
-          onSelect: function(address, variations) {
-            console.log('Selected address:', address);
+          countries: {
+            codesList: "GBR",
+            defaultCode: "GBR"
+          },
+          search: {
+            countries: ["GBR"]
+          },
+          onPopulate: function(address) {
+            console.log('Address selected:', address); // Debug log
             
-            window.handleAddressSelect({
+            // Format the address for our callback
+            var formattedAddress = {
               line1: address.Line1 || '',
               line2: address.Line2 || '',
               city: address.City || '',
-              postcode: address.PostalCode || '',
-            });
+              postcode: address.PostalCode || ''
+            };
+            
+            // Call our Dart callback
+            if (window.handleAddressSelect) {
+              window.handleAddressSelect(formattedAddress);
+            }
           }
-        };
+        });
 
-        var control = new pca.Address(fields, options);
+        window.addressNowControl = control;  // Store reference
         window.addressNowInitialized = true;
       }
     ''']);
 
     // Setup the callback handler
     js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
-      print('Address selected: $addressData');
+      print('Address selected in Dart: $addressData'); // Debug log
       
       if (addressData != null) {
         setState(() {
