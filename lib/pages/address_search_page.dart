@@ -21,82 +21,76 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
   @override
   void initState() {
     super.initState();
-    // Wait for the DOM to be ready
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      _initializeAddressNow();
-    });
+    _initializeAddressNow();
   }
 
   void _initializeAddressNow() {
     js.context.callMethod('eval', ['''
-      if (typeof pca === 'undefined') {
-        console.error('AddressNow library not loaded');
-        return;
-      }
-
       var input = document.getElementById('$_inputId');
-      if (!input) {
-        console.error('Input element not found');
-        return;
-      }
-
-      if (!window.addressNowInitialized) {
-        try {
-          var control = new pca.Address(input, {
-            key: "YOUR_API_KEY",
-            countries: {
-              codesList: "GBR",
-              defaultCode: "GBR"
-            },
-            bar: {
-              visible: true,
-              showCountry: false
-            },
-            search: {
-              countries: ["GBR"]
-            },
-            onSelect: function(address, variations) {
-              console.log('Address selected event triggered');
-              console.log('Raw address:', address);
-              
-              var formattedAddress = {
-                line1: address.Line1 || '',
-                line2: address.Line2 || '',
-                city: address.City || '',
-                postcode: address.PostalCode || ''
-              };
-              
-              console.log('Formatted address:', formattedAddress);
-              window.handleAddressSelect(formattedAddress);
+      if (input && !window.addressNowInitialized) {
+        var control = new pca.Address(input, {
+          key: "YOUR_API_KEY",
+          countries: {
+            codesList: "GBR",
+            defaultCode: "GBR"
+          },
+          search: {
+            countries: ["GBR"],
+            setCountry: "GBR"
+          },
+          onSelect: function(address, variations) {
+            console.log('Address selected:', address);
+            
+            if (!address) {
+              console.error('No address data received');
+              return;
             }
-          });
+            
+            // Format the address for our callback
+            var formattedAddress = {
+              line1: address.Line1 || '',
+              line2: address.Line2 || '',
+              city: address.City || '',
+              postcode: address.PostalCode || ''
+            };
+            
+            console.log('Calling handleAddressSelect with:', formattedAddress);
+            window.handleAddressSelect(formattedAddress);
+          }
+        });
 
-          window.addressNowControl = control;
-          window.addressNowInitialized = true;
-          console.log('AddressNow successfully initialized');
-        } catch (error) {
-          console.error('Error initializing AddressNow:', error);
-        }
+        window.addressNowControl = control;
+        window.addressNowInitialized = true;
+        console.log('AddressNow initialized successfully');
       }
     ''']);
 
+    // Setup the callback handler
     js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
-      print('Dart callback received address: $addressData');
+      print('Address selected in Dart: $addressData');
       
-      if (addressData != null) {
-        try {
-          final address = Map<String, dynamic>.from(addressData);
-          print('Converting to Dart map: $address');
-          
-          setState(() {
-            _selectedAddress = Address.fromJson(address);
-            _isContinueEnabled = true;
-            print('Updated state - Selected address: $_selectedAddress');
-            print('Continue button enabled: $_isContinueEnabled');
-          });
-        } catch (e) {
-          print('Error processing address in Dart: $e');
+      if (addressData == null) {
+        print('Error: Received null address data');
+        return;
+      }
+
+      try {
+        final Map<String, dynamic> address = Map<String, dynamic>.from(addressData);
+        
+        if (address.isEmpty) {
+          print('Error: Empty address data');
+          return;
         }
+
+        setState(() {
+          _selectedAddress = Address.fromJson(address);
+          _isContinueEnabled = _selectedAddress != null && 
+                             _selectedAddress!.line1.isNotEmpty;
+          print('State updated - Selected address: $_selectedAddress');
+          print('Continue button enabled: $_isContinueEnabled');
+        });
+      } catch (e) {
+        print('Error processing address: $e');
       }
     });
   }
@@ -118,18 +112,16 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: _isContinueEnabled
+                onPressed: (_isContinueEnabled && _selectedAddress != null)
                     ? () {
-                        if (_selectedAddress != null) {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => AddressDetailsPage(
-                                address: _selectedAddress!,
-                              ),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => AddressDetailsPage(
+                              address: _selectedAddress!,
                             ),
-                          );
-                        }
+                          ),
+                        );
                       }
                     : null,
                 child: const Text('Continue'),
