@@ -21,7 +21,7 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
   @override
   void initState() {
     super.initState();
-    _initializeAddressNow();
+    Future.delayed(const Duration(milliseconds: 500), _initializeAddressNow);
   }
 
   void _initializeAddressNow() {
@@ -31,7 +31,7 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
         var control = new pca.Address(input, {
           key: "YOUR_API_KEY",
           countries: {
-            codesList: ["GBR"],
+            codesList: "GBR",
             defaultCode: "GBR"
           },
           search: {
@@ -41,66 +41,62 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
             visible: true,
             showCountry: false
           },
-          capture: "line1,line2,city,postcode",
           onPopulate: function(address) {
-            console.log('onPopulate triggered with:', address);
-            
-            // Format the address for our callback
-            var formattedAddress = {
-              line1: address.Line1 || '',
-              line2: address.Line2 || '',
-              city: address.City || '',
-              postcode: address.PostalCode || ''
-            };
-            
-            console.log('Formatted address:', formattedAddress);
-            
-            // Call our callback
-            if (typeof window.handleAddressSelect === 'function') {
-              window.handleAddressSelect(formattedAddress);
-            } else {
-              console.error('handleAddressSelect is not defined');
-            }
+            console.log('onPopulate event:', address);
+            handleAddressSelection(address);
           },
-          onSearchComplete: function(items) {
-            console.log('Search complete with items:', items);
+          onSelect: function(address) {
+            console.log('onSelect event:', address);
+            handleAddressSelection(address);
           }
         });
 
-        // Store control reference globally
+        window.handleAddressSelection = function(address) {
+          if (!address) {
+            console.error('No address data received');
+            return;
+          }
+
+          var formattedAddress = {
+            line1: address.Line1 || '',
+            line2: address.Line2 || '',
+            city: address.City || '',
+            postcode: address.PostalCode || ''
+          };
+
+          console.log('Formatted address:', formattedAddress);
+          window.handleAddressSelect(formattedAddress);
+        };
+
         window.addressNowControl = control;
         window.addressNowInitialized = true;
-        console.log('AddressNow initialized with direct configuration');
+        console.log('AddressNow initialized successfully');
       }
     ''']);
 
-    // Setup the callback handler
     js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
-      print('handleAddressSelect called with: $addressData');
+      print('Dart received address: $addressData');
       
       if (addressData == null) {
-        print('Error: Received null address data');
+        print('Error: Null address data received');
         return;
       }
 
       try {
         final Map<String, dynamic> address = Map<String, dynamic>.from(addressData);
-        print('Processing address data: $address');
+        print('Processing address: $address');
 
         if (mounted) {
           setState(() {
             _selectedAddress = Address.fromJson(address);
             _isContinueEnabled = _selectedAddress != null && 
                                _selectedAddress!.line1.isNotEmpty;
-            print('State updated:');
-            print('Selected address: $_selectedAddress');
+            print('Address set: $_selectedAddress');
             print('Continue enabled: $_isContinueEnabled');
           });
         }
-      } catch (e, stackTrace) {
-        print('Error processing address:');
-        print('Error: $e');
-        print('Stack trace: $stackTrace');
+      } catch (e) {
+        print('Error processing address: $e');
       }
     });
   }
@@ -121,14 +117,18 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
                 child: HtmlElementView(viewType: _inputId),
               ),
               const SizedBox(height: 16),
-              // Debug text to show current state
-              Text('Selected Address: ${_selectedAddress?.toString() ?? "None"}'),
-              Text('Continue Enabled: $_isContinueEnabled'),
-              const SizedBox(height: 16),
+              if (_selectedAddress != null)
+                Padding(
+                  padding: const EdgeInsets.all(8.0),
+                  child: Text(
+                    'Selected: ${_selectedAddress!.line1}, ${_selectedAddress!.postcode}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
               ElevatedButton(
                 onPressed: (_selectedAddress != null && _isContinueEnabled)
                     ? () {
-                        print('Continue button pressed');
+                        print('Navigating with address: $_selectedAddress');
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -151,9 +151,8 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
   @override
   void dispose() {
     js.context.callMethod('eval', ['''
-      var input = document.getElementById('$_inputId');
-      if (input) {
-        input.remove();
+      if (window.addressNowControl) {
+        window.addressNowControl.destroy();
       }
       window.addressNowInitialized = false;
     ''']);
