@@ -28,44 +28,33 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
     js.context.callMethod('eval', ['''
       var input = document.getElementById('$_inputId');
       if (input && !window.addressNowInitialized) {
-        var control = new pca.Address(input, {
+        var fields = [{
+          element: input,
+          field: "",
+          mode: pca.fieldMode.SEARCH
+        }];
+
+        var options = {
           key: "YOUR_API_KEY",
+          search: {
+            countries: ['GBR']
+          },
           countries: {
             codesList: "GBR",
             defaultCode: "GBR"
           },
-          search: {
-            countries: ["GBR"],
-            setCountry: "GBR"
-          },
-          onSelect: function(address, variations) {
-            console.log('onSelect triggered with address:', address);
-            
-            if (!address) {
-              console.error('No address data in onSelect');
-              return;
-            }
-            
-            // Format the address for our callback
-            var formattedAddress = {
-              line1: address.Line1 || '',
-              line2: address.Line2 || '',
-              city: address.City || '',
-              postcode: address.PostalCode || ''
-            };
-            
-            console.log('Formatted address in onSelect:', formattedAddress);
-            window.handleAddressSelect(formattedAddress);
+          bar: {
+            visible: true,
+            showCountry: false
           },
           onPopulate: function(address, variations) {
-            console.log('onPopulate triggered with address:', address);
+            console.log('Address populated:', address);
             
             if (!address) {
-              console.error('No address data in onPopulate');
+              console.error('No address data received');
               return;
             }
             
-            // Format the address for our callback
             var formattedAddress = {
               line1: address.Line1 || '',
               line2: address.Line2 || '',
@@ -73,18 +62,18 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
               postcode: address.PostalCode || ''
             };
             
-            console.log('Formatted address in onPopulate:', formattedAddress);
+            console.log('Calling handleAddressSelect with:', formattedAddress);
             window.handleAddressSelect(formattedAddress);
           }
-        });
+        };
 
+        var control = new pca.Address(fields, options);
         window.addressNowControl = control;
         window.addressNowInitialized = true;
-        console.log('AddressNow initialized successfully');
+        console.log('AddressNow initialized with fields and options');
       }
     ''']);
 
-    // Setup the callback handler with verbose logging
     js.context['handleAddressSelect'] = js.allowInterop((dynamic addressData) {
       print('handleAddressSelect called with data: $addressData');
       
@@ -95,31 +84,15 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
 
       try {
         final Map<String, dynamic> address = Map<String, dynamic>.from(addressData);
-        print('Successfully converted to Dart Map: $address');
+        print('Converting to Dart Map: $address');
         
-        if (address.isEmpty) {
-          print('Error: Empty address data');
-          return;
-        }
-
-        // Create the Address object first to validate it
-        final newAddress = Address.fromJson(address);
-        print('Successfully created Address object: $newAddress');
-
-        // Only update state if we have a valid address
-        if (newAddress.line1.isNotEmpty) {
-          setState(() {
-            _selectedAddress = newAddress;
-            _isContinueEnabled = true;
-            print('State updated - Selected address: $_selectedAddress');
-            print('Continue button enabled: $_isContinueEnabled');
-          });
-        } else {
-          print('Error: Invalid address - line1 is empty');
-        }
-      } catch (e, stackTrace) {
+        setState(() {
+          _selectedAddress = Address.fromJson(address);
+          _isContinueEnabled = true;
+          print('State updated with address: $_selectedAddress');
+        });
+      } catch (e) {
         print('Error processing address: $e');
-        print('Stack trace: $stackTrace');
       }
     });
   }
