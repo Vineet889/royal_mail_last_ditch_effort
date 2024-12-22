@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:js' as js;
+import 'package:flutter/services.dart';
+import 'dart:ui_web' as ui;
+import 'dart:html' as html;
 import 'address_details_page.dart';
 import '../models/address.dart';
 
@@ -18,10 +21,19 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
   @override
   void initState() {
     super.initState();
-    _registerViewFactory();
-    
-    // Add the scripts after registering the factory
-    Future.delayed(const Duration(milliseconds: 100), () {
+    // Register the view factory using the proper Flutter mechanism
+    ui.platformViewRegistry.registerViewFactory(_inputId, (int viewId) {
+      final input = html.InputElement()
+        ..id = _inputId
+        ..style.width = '100%'
+        ..style.height = '100%'
+        ..style.padding = '8px'
+        ..style.border = '1px solid #ccc'
+        ..style.borderRadius = '4px'
+        ..style.fontSize = '16px'
+        ..placeholder = 'Enter your postcode';
+      
+      // Add the scripts after creating the element
       _addScriptToHead('https://api.addressnow.co.uk/css/addressnow-2.20.min.css?key=YOUR_API_KEY');
       _addScriptToHead('https://api.addressnow.co.uk/js/addressnow-2.20.min.js?key=YOUR_API_KEY');
       
@@ -29,44 +41,16 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
       Future.delayed(const Duration(milliseconds: 1000), () {
         _initializeAddressNow();
       });
+
+      return input;
     });
   }
 
-  void _registerViewFactory() {
-    // Register the view factory immediately
-    js.context.callMethod('eval', ['''
-      if (!window.${_inputId}_registered) {
-        var viewFactory = {
-          createElement: function() {
-            var input = document.createElement('input');
-            input.id = '$_inputId';
-            input.type = 'text';
-            input.style.width = '100%';
-            input.style.height = '100%';
-            input.style.padding = '8px';
-            input.style.border = '1px solid #ccc';
-            input.style.borderRadius = '4px';
-            input.style.fontSize = '16px';
-            input.placeholder = 'Enter your postcode';
-            return input;
-          }
-        };
-        
-        window.platformViewRegistry.registerViewFactory('$_inputId-view', function(viewId) {
-          return viewFactory.createElement();
-        });
-        
-        window.${_inputId}_registered = true;
-      }
-    ''']);
-  }
-
   void _addScriptToHead(String src) {
-    js.context.callMethod('eval', ['''
-      var script = document.createElement('script');
-      script.src = '$src';
-      document.head.appendChild(script);
-    ''']);
+    final script = html.ScriptElement()
+      ..src = src
+      ..type = 'text/javascript';
+    html.document.head!.children.add(script);
   }
 
   void _initializeAddressNow() {
@@ -123,7 +107,7 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
                 border: Border.all(color: Colors.transparent),
                 borderRadius: BorderRadius.circular(4),
               ),
-              child: HtmlElementView(viewType: '$_inputId-view'),
+              child: HtmlElementView(viewType: _inputId),
             ),
             const SizedBox(height: 16),
             ElevatedButton(
@@ -155,7 +139,6 @@ class _AddressSearchPageState extends State<AddressSearchPage> {
         input.remove();
       }
       window.addressNowInitialized = false;
-      window.${_inputId}_registered = false;
     ''']);
     super.dispose();
   }
